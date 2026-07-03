@@ -1,1 +1,5 @@
 credentials.json
+
+.vercel
+.env*
+__pycache__/
