@@ -8,4 +8,4 @@ dependencies = [
 ]
 
 [tool.vercel]
-entrypoint = "api/webhook.py"
+entrypoint = "api.webhook:handler"
