@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import json
-import hashlib
 from http.server import BaseHTTPRequestHandler
 import gspread
 from google.oauth2.service_account import Credentials
@@ -51,19 +50,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b'OK')
-
-    def do_GET(self):
-        key = os.environ.get('GOOGLE_PRIVATE_KEY', '')
-        email = os.environ.get('GOOGLE_CLIENT_EMAIL', '')
-        info = {
-            'key_len': len(key),
-            'key_md5': hashlib.md5(key.encode('utf-8', errors='replace')).hexdigest(),
-            'email': email,
-        }
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(info).encode('utf-8'))
 
     def log_message(self, format, *args):
         pass
