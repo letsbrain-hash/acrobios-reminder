@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import json
-import base64
+import hashlib
 from http.server import BaseHTTPRequestHandler
 import gspread
 from google.oauth2.service_account import Credentials
@@ -11,9 +11,12 @@ ROSTER_SHEET_NAME = '服務人員名冊'
 
 
 def get_sheet():
-    encoded = os.environ['GOOGLE_CREDENTIALS_BASE64']
-    print(f'DEBUG len={len(encoded)} prefix={encoded[:20]!r} suffix={encoded[-20:]!r}')
-    info = json.loads(base64.b64decode(encoded))
+    info = {
+        'type': 'service_account',
+        'client_email': os.environ['GOOGLE_CLIENT_EMAIL'],
+        'private_key': os.environ['GOOGLE_PRIVATE_KEY'],
+        'token_uri': 'https://oauth2.googleapis.com/token',
+    }
     creds = Credentials.from_service_account_info(
         info, scopes=['https://www.googleapis.com/auth/spreadsheets']
     )
@@ -48,6 +51,19 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b'OK')
+
+    def do_GET(self):
+        key = os.environ.get('GOOGLE_PRIVATE_KEY', '')
+        email = os.environ.get('GOOGLE_CLIENT_EMAIL', '')
+        info = {
+            'key_len': len(key),
+            'key_md5': hashlib.md5(key.encode('utf-8', errors='replace')).hexdigest(),
+            'email': email,
+        }
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(info).encode('utf-8'))
 
     def log_message(self, format, *args):
         pass
