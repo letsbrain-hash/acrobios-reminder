@@ -1,2 +1,11 @@
+[project]
+name = "acrobios-reminder"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "gspread",
+    "google-auth",
+]
+
 [tool.vercel]
-entrypoint = "api.webhook:handler"
+entrypoint = "api/webhook.py"
