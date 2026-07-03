@@ -65,7 +65,7 @@ def main():
             continue
 
         remind_date = appt_date - datetime.timedelta(days=days)
-        if remind_date != today:
+        if remind_date > today:
             continue
 
         text = f'提醒：{name} 預約於 {date_str}（{staff}負責）'
