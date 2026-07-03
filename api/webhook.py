@@ -12,6 +12,7 @@ ROSTER_SHEET_NAME = '服務人員名冊'
 
 def get_sheet():
     encoded = os.environ['GOOGLE_CREDENTIALS_BASE64']
+    print(f'DEBUG len={len(encoded)} prefix={encoded[:20]!r} suffix={encoded[-20:]!r}')
     info = json.loads(base64.b64decode(encoded))
     creds = Credentials.from_service_account_info(
         info, scopes=['https://www.googleapis.com/auth/spreadsheets']
