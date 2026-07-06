@@ -2,6 +2,7 @@
 import os
 import json
 import base64
+import datetime
 import email.utils
 import urllib.request
 from google.oauth2 import service_account
@@ -66,7 +67,17 @@ def find_attachment_parts(part):
     return found
 
 
+def last_month_range():
+    today = datetime.date.today()
+    first_of_this_month = today.replace(day=1)
+    last_of_prev_month = first_of_this_month - datetime.timedelta(days=1)
+    first_of_prev_month = last_of_prev_month.replace(day=1)
+    return first_of_prev_month, first_of_this_month
+
+
 def collect_attachments(gmail_service, query):
+    start, end = last_month_range()
+    query = f'{query} after:{start.strftime("%Y/%m/%d")} before:{end.strftime("%Y/%m/%d")}'
     results = gmail_service.users().messages().list(userId='me', q=query, maxResults=20).execute()
     messages = results.get('messages', [])
     items = []
