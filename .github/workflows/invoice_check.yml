@@ -2,7 +2,7 @@ name: Invoice Check
 
 on:
   schedule:
-    - cron: '0 2 5 * *'
+    - cron: '0 2 5,10 * *'
   workflow_dispatch:
 
 jobs:
