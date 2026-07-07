@@ -49,6 +49,8 @@ def detect_service_name(subject):
         return 'GoogleWorkspace'
     if 'Anthropic' in subject or 'receipt' in subject.lower():
         return 'Claude'
+    if 'Canva' in subject:
+        return 'Canva'
     if 'Google' in subject:
         return 'Google'
     return 'Unknown'
@@ -122,12 +124,14 @@ def upload_to_drive(drive_service, items):
 def main():
     try:
         gmail_letsbrain = get_delegated_gmail('letsbrain@acrobios.com')
+        gmail_design = get_delegated_gmail('design@acrobios.com')
         gmail_0503, drive_0503 = get_oauth_gmail_and_drive()
 
         items = []
         items += collect_attachments(gmail_letsbrain, 'from:mail.anthropic.com')
         items += collect_attachments(gmail_letsbrain, 'from:payments-noreply@google.com')
         items += collect_attachments(gmail_0503, 'from:payments-noreply@google.com')
+        items += collect_attachments(gmail_design, 'from:no-reply@canva.com')
 
         uploaded = upload_to_drive(drive_0503, items)
         print(f'完成，共處理 {len(uploaded)} 個檔案：{uploaded}')
