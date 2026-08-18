@@ -60,6 +60,11 @@ def month_from_date_header(date_str):
     return email.utils.parsedate_to_datetime(date_str).month
 
 
+def year_month_from_date_header(date_str):
+    dt = email.utils.parsedate_to_datetime(date_str)
+    return dt.year, dt.month
+
+
 def find_attachment_parts(part):
     found = []
     if part.get('filename') and part.get('body', {}).get('attachmentId'):
@@ -78,6 +83,9 @@ def last_month_range():
 
 
 def collect_attachments(gmail_service, query):
+    """回傳 [(internal_date, year, month, service_name, data)]。
+    一封信＝一張發票＝一個檔案，只取第一個附件（Anthropic 一封信夾 Invoice/Receipt
+    兩個 PDF，內容相同，取一個就好）。編號在 main() 統一排序後才給，避免抓取順序影響檔名。"""
     start, end = last_month_range()
     query = f'{query} after:{start.strftime("%Y/%m/%d")} before:{end.strftime("%Y/%m/%d")}'
     results = gmail_service.users().messages().list(userId='me', q=query, maxResults=20).execute()
@@ -87,17 +95,36 @@ def collect_attachments(gmail_service, query):
         msg = gmail_service.users().messages().get(userId='me', id=m['id'], format='full').execute()
         headers = {h['name']: h['value'] for h in msg['payload']['headers']}
         subject = headers.get('Subject', '')
-        month = month_from_date_header(headers.get('Date', ''))
+        year, month = year_month_from_date_header(headers.get('Date', ''))
         service_name = detect_service_name(subject)
-        for part in find_attachment_parts(msg['payload']):
-            att_id = part['body']['attachmentId']
-            att = gmail_service.users().messages().attachments().get(
-                userId='me', messageId=m['id'], id=att_id
-            ).execute()
-            data = base64.urlsafe_b64decode(att['data'])
-            filename = f"{month}月{service_name}發票收據.pdf"
-            items.append((filename, data))
+        internal_date = int(msg.get('internalDate', 0))
+        parts = find_attachment_parts(msg['payload'])
+        if not parts:
+            continue
+        part = parts[0]
+        att_id = part['body']['attachmentId']
+        att = gmail_service.users().messages().attachments().get(
+            userId='me', messageId=m['id'], id=att_id
+        ).execute()
+        data = base64.urlsafe_b64decode(att['data'])
+        items.append((internal_date, year, month, service_name, data))
     return items
+
+
+def build_filenames(raw_items):
+    """同一年同一個月、同一個服務有多張發票時，依信件時間先後編 01、02、03…
+    檔名帶年份，跨年不會互相覆蓋。
+    排序固定用信件時間，所以重跑（5號跑一次、10號再跑一次）編號不會跳掉或對調。"""
+    raw_items.sort(key=lambda x: x[0])
+    counter = {}
+    named = []
+    for _, year, month, service_name, data in raw_items:
+        key = (year, month, service_name)
+        counter[key] = counter.get(key, 0) + 1
+        seq = counter[key]
+        filename = f"{year}年{month}月{service_name}發票收據{seq:02d}.pdf"
+        named.append((filename, data))
+    return named
 
 
 def upload_to_drive(drive_service, items):
@@ -127,12 +154,13 @@ def main():
         gmail_design = get_delegated_gmail('design@acrobios.com')
         gmail_0503, drive_0503 = get_oauth_gmail_and_drive()
 
-        items = []
-        items += collect_attachments(gmail_letsbrain, 'from:mail.anthropic.com')
-        items += collect_attachments(gmail_letsbrain, 'from:payments-noreply@google.com')
-        items += collect_attachments(gmail_0503, 'from:payments-noreply@google.com')
-        items += collect_attachments(gmail_design, 'from:no-reply@canva.com')
+        raw_items = []
+        raw_items += collect_attachments(gmail_letsbrain, 'from:mail.anthropic.com')
+        raw_items += collect_attachments(gmail_letsbrain, 'from:payments-noreply@google.com')
+        raw_items += collect_attachments(gmail_0503, 'from:payments-noreply@google.com')
+        raw_items += collect_attachments(gmail_design, 'from:no-reply@canva.com')
 
+        items = build_filenames(raw_items)
         uploaded = upload_to_drive(drive_0503, items)
         print(f'完成，共處理 {len(uploaded)} 個檔案：{uploaded}')
 
