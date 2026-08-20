@@ -2,6 +2,7 @@
 import os
 import json
 import base64
+import hashlib
 import datetime
 import email.utils
 import urllib.request
@@ -111,40 +112,57 @@ def collect_attachments(gmail_service, query):
     return items
 
 
-def build_filenames(raw_items):
-    """同一年同一個月、同一個服務有多張發票時，依信件時間先後編 01、02、03…
-    檔名帶年份，跨年不會互相覆蓋。
-    排序固定用信件時間，所以重跑（5號跑一次、10號再跑一次）編號不會跳掉或對調。"""
+def build_items(raw_items):
+    """只做排序，不編號。檔名（序號）等到 upload_to_drive() 看過雲端現況才決定。
+
+    ⚠️ 舊做法是在這裡按「本次抓到的信」依序編 01、02…，但抓取視窗改成滾動 45 天之後
+    這會出事：例如 8/1、8/7 各一張 Google Workspace 發票，到了 9/20 視窗只剩 8/6 之後，
+    8/1 那封掉出視窗，8/7 那封就會變成 01 去覆蓋掉 8/1 的發票（兩張檔案大小還一樣，
+    完全看不出來）。所以序號改成依「雲端已經有什麼」來配。"""
     raw_items.sort(key=lambda x: x[0])
-    counter = {}
-    named = []
-    for _, year, month, service_name, data in raw_items:
-        key = (year, month, service_name)
-        counter[key] = counter.get(key, 0) + 1
-        seq = counter[key]
-        filename = f"{year}年{month}月{service_name}發票收據{seq:02d}.pdf"
-        named.append((filename, data))
-    return named
+    return [(y, m, svc, data) for _, y, m, svc, data in raw_items]
 
 
 def upload_to_drive(drive_service, items):
+    """items: [(year, month, service_name, data)]，已依信件時間排序。
+
+    三條規則，任何情況都不會蓋掉既有檔案：
+    1. 內容的 md5 已經在資料夾裡 → 完全跳過（重跑、同一封信被抓兩次都安全）
+    2. 內容是新的 → 配給該「年月服務」還沒被佔用的最小序號，建立新檔
+    3. 永遠不呼叫 files().update() 覆蓋內容
+
+    要換掉某張發票，請先到雲端把舊檔刪掉／移走，下次跑就會重新抓。
+    """
     existing = drive_service.files().list(
         q=f"'{DRIVE_FOLDER_ID}' in parents and trashed=false",
-        fields='files(id, name)'
+        fields='files(id, name, md5Checksum)', pageSize=300
     ).execute().get('files', [])
-    existing_names = {f['name']: f['id'] for f in existing}
+    existing_md5 = {f.get('md5Checksum') for f in existing if f.get('md5Checksum')}
+    existing_names = {f['name'] for f in existing}
 
     from googleapiclient.http import MediaInMemoryUpload
-    uploaded = []
-    for filename, data in items:
+    uploaded, skipped = [], []
+    for year, month, service_name, data in items:
+        digest = hashlib.md5(data).hexdigest()
+        if digest in existing_md5:
+            skipped.append(f'{year}年{month}月{service_name}（內容雲端已有）')
+            continue
+
+        seq = 1
+        while f'{year}年{month}月{service_name}發票收據{seq:02d}.pdf' in existing_names:
+            seq += 1
+        filename = f'{year}年{month}月{service_name}發票收據{seq:02d}.pdf'
+
         media = MediaInMemoryUpload(data, mimetype='application/pdf')
-        if filename in existing_names:
-            drive_service.files().update(fileId=existing_names[filename], media_body=media).execute()
-        else:
-            drive_service.files().create(
-                body={'name': filename, 'parents': [DRIVE_FOLDER_ID]}, media_body=media
-            ).execute()
+        drive_service.files().create(
+            body={'name': filename, 'parents': [DRIVE_FOLDER_ID]}, media_body=media
+        ).execute()
+        existing_names.add(filename)
+        existing_md5.add(digest)
         uploaded.append(filename)
+
+    if skipped:
+        print(f'略過 {len(skipped)} 個（內容相同）：{skipped}')
     return uploaded
 
 
@@ -160,7 +178,7 @@ def main():
         raw_items += collect_attachments(gmail_0503, 'from:payments-noreply@google.com')
         raw_items += collect_attachments(gmail_design, 'from:no-reply@canva.com')
 
-        items = build_filenames(raw_items)
+        items = build_items(raw_items)
         uploaded = upload_to_drive(drive_0503, items)
         print(f'完成，共處理 {len(uploaded)} 個檔案：{uploaded}')
 
