@@ -74,19 +74,19 @@ def find_attachment_parts(part):
     return found
 
 
-def last_month_range():
+def recent_range():
+    """每天跑，所以抓「最近 45 天」而不是「上個月」。
+    45 天保證涵蓋當月＋上個月，發票信一寄到隔天就會被抓進雲端，
+    不用再等 5 號／10 號。已存在的檔名 upload_to_drive() 會跳過，重複跑不會出事。"""
     today = datetime.date.today()
-    first_of_this_month = today.replace(day=1)
-    last_of_prev_month = first_of_this_month - datetime.timedelta(days=1)
-    first_of_prev_month = last_of_prev_month.replace(day=1)
-    return first_of_prev_month, first_of_this_month
+    return today - datetime.timedelta(days=45), today + datetime.timedelta(days=1)
 
 
 def collect_attachments(gmail_service, query):
     """回傳 [(internal_date, year, month, service_name, data)]。
     一封信＝一張發票＝一個檔案，只取第一個附件（Anthropic 一封信夾 Invoice/Receipt
     兩個 PDF，內容相同，取一個就好）。編號在 main() 統一排序後才給，避免抓取順序影響檔名。"""
-    start, end = last_month_range()
+    start, end = recent_range()
     query = f'{query} after:{start.strftime("%Y/%m/%d")} before:{end.strftime("%Y/%m/%d")}'
     results = gmail_service.users().messages().list(userId='me', q=query, maxResults=20).execute()
     messages = results.get('messages', [])
