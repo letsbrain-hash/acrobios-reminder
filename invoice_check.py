@@ -169,14 +169,12 @@ def upload_to_drive(drive_service, items):
 def main():
     try:
         gmail_letsbrain = get_delegated_gmail('letsbrain@acrobios.com')
-        gmail_design = get_delegated_gmail('design@acrobios.com')
         gmail_0503, drive_0503 = get_oauth_gmail_and_drive()
 
         raw_items = []
         raw_items += collect_attachments(gmail_letsbrain, 'from:mail.anthropic.com')
         raw_items += collect_attachments(gmail_letsbrain, 'from:payments-noreply@google.com')
         raw_items += collect_attachments(gmail_0503, 'from:payments-noreply@google.com')
-        raw_items += collect_attachments(gmail_design, 'from:no-reply@canva.com')
 
         items = build_items(raw_items)
         uploaded = upload_to_drive(drive_0503, items)
