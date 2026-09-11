@@ -11,11 +11,13 @@ from google.oauth2.credentials import Credentials as UserCredentials
 from googleapiclient.discovery import build
 
 GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-# 2026-09-11：發票收據資料夾搬進共用雲端硬碟（請款發票\發票收據），資料夾 ID 跟著換。
-# 舊 ID 1Mj6kFxeeWP5ZJkryeLXpHcFR-HiJsUfz 已不存在，Drive API 回 404。
+# 2026-09-11：發票收據已搬進共用雲端硬碟。7 拍板收在「會計」那一棵：
+#   共用雲端硬碟\璽愛診所Acrobios\璽愛診所\會計\請款發票\發票收據
+# ⛔ 不要指到 ...\璽愛診所Acrobioscrobios0503\璽愛診所\... 那一棵，那是 9/9 倒進來的舊雲端備份。
+# ⛔ 舊 ID 1Mj6kFxeeWP5ZJkryeLXpHcFR-HiJsUfz（原我的雲端硬碟）已不存在，Drive API 回 404。
 # ⚠️ 共用雲端硬碟的檔案，每個 Drive API 呼叫都要帶 supportsAllDrives / includeItemsFromAllDrives，
 #    只換 ID 不帶這兩個參數一樣是 404。
-DRIVE_FOLDER_ID = '1ryTGJsFKg6edahh-3CZqVplIV80OMmde'
+DRIVE_FOLDER_ID = '1PLlPTxCvUURn7K5zH68HnmXY4IlFrtr9'
 LINE_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '')
 LINE_TO_USER_ID = os.environ.get('LINE_NOTIFY_USER_ID', '')
 
